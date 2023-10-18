@@ -26,6 +26,7 @@ import statistics
 import textwrap
 import matplotlib.pyplot as plt
 matplotlib.use("Agg")
+from collections import Counter
 
 __author__ = "Your Name"
 __copyright__ = "Universite Paris Diderot"
@@ -81,16 +82,21 @@ def read_fastq(fastq_file):
     :param fastq_file: (str) Path to the fastq file.
     :return: A generator object that iterate the read sequences. 
     """
-    pass
+    with open(fastq_file, 'r') as fasta:
+        for line in fasta:
+            yield next(fasta)
+            next(fasta)
+            next(fasta)
 
 
 def cut_kmer(read, kmer_size):
     """Cut read into kmers of size kmer_size.
     
     :param read: (str) Sequence of a read.
-    :return: A generator object that iterate the kmers of of size kmer_size.
+    :return: A generator object that iterate the kmers of size kmer_size.
     """
-    pass
+    for i in range(0, len(read) - kmer_size + 1):
+        yield read[i:i + kmer_size]
 
 
 def build_kmer_dict(fastq_file, kmer_size):
@@ -99,7 +105,13 @@ def build_kmer_dict(fastq_file, kmer_size):
     :param fastq_file: (str) Path to the fastq file.
     :return: A dictionnary object that identify all kmer occurrences.
     """
-    pass
+    sequences = read_fastq(fastq_file)
+    kmer_dict = Counter()
+    for sequence in sequences:
+        kmers = cut_kmer(sequence.strip(), kmer_size)
+        kmer_dict.update(kmers)
+
+    return kmer_dict
 
 
 def build_graph(kmer_dict):
@@ -248,6 +260,9 @@ def main(): # pragma: no cover
     """
     # Get arguments
     args = get_arguments()
+    print(build_kmer_dict(args.fastq_file, args.kmer_size))
+    print( args.kmer_size)
+
 
     # Fonctions de dessin du graphe
     # A decommenter si vous souhaitez visualiser un petit 
