@@ -28,13 +28,13 @@ import matplotlib.pyplot as plt
 matplotlib.use("Agg")
 from collections import Counter
 
-__author__ = "Your Name"
+__author__ = "Agsous Salim"
 __copyright__ = "Universite Paris Diderot"
-__credits__ = ["Your Name"]
+__credits__ = ["Agsous Salim"]
 __license__ = "GPL"
 __version__ = "1.0.0"
-__maintainer__ = "Your Name"
-__email__ = "your@email.fr"
+__maintainer__ = "Agsous Salim"
+__email__ = "salim.agsous99@gmail.comr"
 __status__ = "Developpement"
 
 def isfile(path): # pragma: no cover
@@ -84,7 +84,7 @@ def read_fastq(fastq_file):
     """
     with open(fastq_file, 'r') as fasta:
         for line in fasta:
-            yield next(fasta)
+            yield next(fasta).strip("\n")
             next(fasta)
             next(fasta)
 
@@ -137,8 +137,26 @@ def remove_paths(graph, path_list, delete_entry_node, delete_sink_node):
     :param delete_sink_node: (boolean) True->We remove the last node of a path
     :return: (nx.DiGraph) A directed graph object
     """
-
-    pass
+    if (type(path_list[0]) != int):
+        for path in path_list:
+            if (delete_entry_node and delete_sink_node):
+                graph.remove_nodes_from(path)
+            elif (delete_entry_node):
+                graph.remove_nodes_from(path[:-1])
+            elif (delete_sink_node):
+                graph.remove_nodes_from(path[1:])
+            else:
+                graph.remove_nodes_from(path[1:-1])
+    else:
+        if (delete_entry_node and delete_sink_node):
+            graph.remove_nodes_from(path_list)
+        elif (delete_entry_node):
+            graph.remove_nodes_from(path_list[:-1])
+        elif (delete_sink_node):
+            graph.remove_nodes_from(path_list[1:])
+        else:
+            graph.remove_nodes_from(path_list[1:-1])
+    return graph
 
 
 def select_best_path(graph, path_list, path_length, weight_avg_list, 
@@ -153,7 +171,24 @@ def select_best_path(graph, path_list, path_length, weight_avg_list,
     :param delete_sink_node: (boolean) True->We remove the last node of a path
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    if (statistics.stdev(weight_avg_list) > 0):
+        ind = weight_avg_list.index(max(weight_avg_list))
+        #remove the weight from the more recurrent path
+        path_list.pop(ind)
+        graph = remove_paths(graph, path_list, delete_entry_node, delete_sink_node)
+    elif (statistics.stdev(path_length) > 0):
+        ind = path_length.index(max(path_length))
+        #remove the longest path
+        path_list.pop(ind)
+        graph = remove_paths(graph, path_list, delete_entry_node, delete_sink_node)
+    else:
+        random.seed(9001)
+        r = random.randint(0, len(path_list))
+        # remove randomly a path
+        path_list.pop(r)
+        graph = remove_paths(graph, path_list, delete_entry_node, delete_sink_node)
+
+    return graph
 
 def path_average_weight(graph, path):
     """Compute the weight of a path
@@ -172,15 +207,48 @@ def solve_bubble(graph, ancestor_node, descendant_node):
     :param descendant_node: (str) A downstream node in the graph
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    list_of_path = list(nx.all_simple_paths(graph, ancestor_node, descendant_node))
+    len_path = []
+    weight_avg_list = []
+    for i in list_of_path:
+        w = []
+        len_path.append(len(i))
+        weight_l = list(graph.subgraph(i).edges(data=True))
+        for j in weight_l:
+            # take d where the value of weight is
+            w.append(j[2]['weight'])
+        weight_avg_list.append(statistics.mean(w))
+    # select the better path
+    graph = select_best_path(graph,list_of_path,len_path,weight_avg_list,
+                             delete_entry_node=False,delete_sink_node=False)
 
+    return graph
 def simplify_bubbles(graph):
     """Detect and explode bubbles
 
     :param graph: (nx.DiGraph) A directed graph object
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    bubble = False
+    for i in graph.nodes:
+        node = i
+        list_prd = list(graph.predecessors(i))
+        if len(list_prd) > 1:
+            for j in list_prd:
+                for pre in list_prd:
+                    node_ancestor = nx.lowest_common_ancestor(graph, pre, j)
+                    if node_ancestor != None:
+                        bubble = True
+                        break
+        if bubble:
+            break
+    # La simplification ayant pour conséquence de supprimer des noeuds du hash
+    # Une approche récursive est nécessaire avec networkx
+    if bubble:
+        graph = simplify_bubbles(solve_bubble(graph, node_ancestor, node))
+
+    return graph
+
 
 def solve_entry_tips(graph, starting_nodes):
     """Remove entry tips
@@ -188,7 +256,22 @@ def solve_entry_tips(graph, starting_nodes):
     :param graph: (nx.DiGraph) A directed graph object
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    start_node_delete = []
+    for start_node in starting_nodes:
+        list_predecessors = list(graph.predecessors(start_node))
+        list_successors = list(graph.successors(start_node))
+
+        if len(list_predecessors) > 0:
+            start_node_delete.append(start_node)
+        elif len(list_successors) > 0:
+            start_node_delete.append(start_node)
+        else:
+            return graph
+
+    for start_node in start_node_delete:
+        graph.remove_node(start_node)
+    return graph
+
 
 def solve_out_tips(graph, ending_nodes):
     """Remove out tips
@@ -196,7 +279,21 @@ def solve_out_tips(graph, ending_nodes):
     :param graph: (nx.DiGraph) A directed graph object
     :return: (nx.DiGraph) A directed graph object
     """
-    pass
+    end_node_delete = []
+    for end_node in ending_nodes:
+        list_predecessors = list(graph.predecessors(end_node))
+        list_successors = list(graph.successors(end_node))
+
+        if len(list_predecessors) > 0:
+            end_node_delete.append(end_node)
+        elif len(list_successors) > 0:
+            end_node_delete.append(end_node)
+        else:
+            return graph
+
+    for end_node in end_node_delete:
+        graph.remove_node(end_node)
+    return graph
 
 def get_starting_nodes(graph):
     """Get nodes without predecessors
@@ -297,13 +394,23 @@ def main(): # pragma: no cover
     # Get arguments
     args = get_arguments()
 
-    kmer_dict = build_kmer_dict(args.fastq_file, args.kmer_size)
-    graph = build_graph(kmer_dict)
-    print(get_starting_nodes(graph))
-    print(get_sink_nodes(graph))
-    liste_contigs = get_contigs(graph,get_starting_nodes(graph),get_sink_nodes(graph))
-    draw_graph(graph,args.output_file)
-
+    dictio_kmer = build_kmer_dict(args.fastq_file, args.kmer_size)
+    print('============================================================ Etape 1 ============================================================')
+    graph = build_graph(dictio_kmer)
+    print('============================================================ Etape 2 ============================================================')
+    start_node = get_starting_nodes(graph)
+    sink_node = get_sink_nodes(graph)
+    print('============================================================ Etape 3 ============================================================')
+    graph = simplify_bubbles(graph)
+    print('============================================================ Etape 4 ============================================================')
+    graph = solve_entry_tips(graph,start_node)
+    print('============================================================ Etape 5 ============================================================')
+    graph = solve_out_tips(graph, sink_node)
+    print('============================================================ Etape 6 ============================================================')
+    contigs = get_contigs(graph,get_starting_nodes(graph),get_sink_nodes(graph))
+    print('============================================================ Etape 7 ============================================================')
+    save_contigs(contigs,args.output_file)
+    print('============================================================ Etape 8 ============================================================')
 
     # Fonctions de dessin du graphe
     # A decommenter si vous souhaitez visualiser un petit 
